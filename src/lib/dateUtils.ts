@@ -1,55 +1,61 @@
-export const AVG_LIFESPAN_YEARS = 80;
+// lib/dateUtils.ts
 
-export function beToCe(beYear: number): number {
-  return beYear - 543;
-}
+export const beToCe = (yearBE: number): number => {
+  return yearBE - 543;
+};
 
-export function ceToBe(ceYear: number): number {
-  return ceYear + 543;
-}
+// คำนวณวันหมดอายุวัยรุ่น (25 ปี)
+export const calculateYouthEndDate = (birthDate: Date): Date => {
+  const youthDate = new Date(birthDate);
+  youthDate.setFullYear(youthDate.getFullYear() + 25);
+  return youthDate;
+};
 
-export function calculateDeathDate(birthDate: Date): Date {
-  const deathDate = new Date(birthDate);
-  deathDate.setFullYear(birthDate.getFullYear() + AVG_LIFESPAN_YEARS);
-  return deathDate;
-}
-
-export interface GenerationInfo {
-  name: string;
-  years: string;
-  nickname: string;
-  fact: string;
-  definition: string;
-  color: string;
-}
-
-import { translations, Language } from './translations';
-
-export function getGenerationRoast(birthYearCE: number, lang: Language = 'th'): GenerationInfo {
-  const t = translations[lang].generations;
-  
-  if (birthYearCE >= 1946 && birthYearCE <= 1964) {
-    return { ...t.boomer, color: "#ff8c00" };
-  } else if (birthYearCE >= 1965 && birthYearCE <= 1980) {
-    return { ...t.genx, color: "#888888" };
-  } else if (birthYearCE >= 1981 && birthYearCE <= 1996) {
-    return { ...t.geny, color: "#ffd700" };
-  } else if (birthYearCE >= 1997 && birthYearCE <= 2009) {
-    return { ...t.genz, color: "#e63946" };
-  } else if (birthYearCE >= 2010 && birthYearCE <= 2024) {
-    return { ...t.alpha, color: "#4ade80" };
-  } else if (birthYearCE >= 2025 && birthYearCE <= 2039) {
-    return { ...t.beta, color: "#3b82f6" };
-  } else {
-    return { ...t.legend, color: "#ffffff" };
+// ข้อมูลแซวแต่ละ Generation
+export const getGenerationRoast = (birthYearCE: number) => {
+  if (birthYearCE >= 2013) {
+    return {
+      nickname: 'Gen Alpha ตัวจิ๋ว',
+      color: '#ff00ff', // สี Neon Pink
+      roast: 'โตมาพร้อม iPad และคุยกับ AI รู้เรื่องกว่าคุยกับคน'
+    };
   }
-}
-
-export function getViralStats(timeLeftMs: number) {
-  const daysLeft = Math.max(0, Math.floor(timeLeftMs / (1000 * 60 * 60 * 24)));
+  if (birthYearCE >= 1997) {
+    return {
+      nickname: 'Gen Z ตัวตึง',
+      color: '#00f2ff', // สี Cyan
+      roast: 'วัยรุ่นเทสดี ที่มีพลังงานล้นเหลือ (ถ้าได้นอนครบ 8 ชั่วโมง)'
+    };
+  }
+  if (birthYearCE >= 1981) {
+    return {
+      nickname: 'Gen Y เดอะแบก',
+      color: '#ff4e50', // สี Red Orange
+      roast: 'วัยรุ่นปวดหลัง ผู้ผ่านวิกฤตมานับไม่ถ้วน แต่ก็ยังสู้งาน'
+    };
+  }
+  if (birthYearCE >= 1965) {
+    return {
+      nickname: 'Gen X วัยเก๋า',
+      color: '#f9d423', // สี Gold
+      roast: 'รุ่นใหญ่ใจนิ่ง ผ่านยุคอนาล็อกสู่ดิจิทัลมาได้อย่างสวยงาม'
+    };
+  }
   return {
-    sunsets: daysLeft,
-    meals: daysLeft * 3,
-    workDays: Math.floor(daysLeft * (5 / 7)),
+    nickname: 'Legendary Boomer',
+    color: '#ffffff',
+    roast: 'ระดับตำนานที่ยังมีลมหายใจ เคารพครับจารย์!'
   };
-}
+};
+
+// คำนวณสถิติขำๆ (ใช้ในหน้ารายงานเต็ม)
+export const getViralStats = (diffMs: number) => {
+  const absMs = Math.abs(diffMs);
+  const totalDays = Math.floor(absMs / (1000 * 60 * 60 * 24));
+  
+  return {
+    coffees: totalDays * 2, // สมมติว่ากินกาแฟวันละ 2 แก้ว
+    sleepLost: totalDays * 3, // ชั่วโมงนอนที่หายไป
+    backaches: Math.floor(totalDays * 0.5), // จำนวนวันที่ปวดหลัง
+  };
+};

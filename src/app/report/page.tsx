@@ -151,6 +151,9 @@ export default function ReportPage() {
   const [birthDateStr, setBirthDateStr] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // เพิ่ม State สำหรับเปิด/ปิดการโชว์สูตรคำนวณ
+  const [showMath, setShowMath] = useState(false);
 
   const yantraRef = useRef<HTMLDivElement>(null);
 
@@ -164,20 +167,17 @@ export default function ReportPage() {
     }
   }, []);
 
-  // ฟังก์ชันถ่ายรูปเฉพาะยันต์ (ปรับแก้ให้ html2canvas วาดภาพได้เป๊ะ 100%)
   const handleSaveYantra = async () => {
     if (!yantraRef.current) return;
     setIsSaving(true);
 
     try {
       await document.fonts.ready;
-
-      // บังคับเลื่อนจอขึ้นบนสุดก่อนถ่าย ป้องกันภาพแหว่ง (Bug ยอดฮิตของ html2canvas)
       window.scrollTo(0, 0);
 
       const canvas = await html2canvas(yantraRef.current, {
         scale: 3,
-        backgroundColor: null, // ให้พื้นหลังใส (ไม่เอาขอบดำๆ ติดมา)
+        backgroundColor: null,
         useCORS: true,
         logging: false
       });
@@ -218,14 +218,18 @@ export default function ReportPage() {
   const beYearInt = birthDate.getFullYear() + 543;
   const age = (now.getTime() - birthDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
 
+  // --- Logic 60 ปี + เช็ควัยเกษียณ ---
   const targetAge = 60;
+  const isRetired = age >= targetAge;
   const daysLeftToTarget = Math.max(0, (targetAge - age) * 365.25);
 
   const weekendsLeft = Math.floor((daysLeftToTarget / 7) * 2);
   const paychecksLeft = Math.floor(daysLeftToTarget / 30.44);
   const activeDaysLeft = Math.floor(daysLeftToTarget * (2 / 3));
+  
   const energyLevel = Math.max(10, Math.floor(age <= 30 ? 100 : 100 - (age - 30) * 2.5));
-  const themeColor = age > 25 ? '#00f2ff' : '#ff4e50';
+  // ถ้าเกษียณให้ใช้สีทอง (#ffd700)
+  const themeColor = isRetired ? '#ffd700' : (age > 25 ? '#00f2ff' : '#ff4e50');
 
   const genSummary = getGenerationSummary(beYearInt);
 
@@ -234,31 +238,18 @@ export default function ReportPage() {
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Kanit:ital,wght@0,300;0,400;0,600;0,800;0,900;1,400&display=swap');
+        
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-slide { animation: slideDown 0.3s ease-out forwards; }
+
         .glass-panel { backdrop-filter: blur(20px); background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 32px; }
         .big-number { font-weight: 900; line-height: 1; background: linear-gradient(to bottom, #fff 60%, ${themeColor}); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-variant-numeric: tabular-nums; }
         
-        /* 🔴 แก้ไขสไตล์ยันต์แผ่นทองให้ html2canvas รองรับ 100% 🔴 */
-        .yantra-outer {
-          background: linear-gradient(135deg, #e6c27a 0%, #ffe599 25%, #c59b3c 50%, #ffe599 75%, #996515 100%);
-          border: 4px solid #8b0000;
-          padding: 8px; /* เว้นระยะให้กรอบใน */
-          position: relative;
-          color: #3b1e00;
-        }
-        .yantra-inner {
-          border: 2px solid #e6c27a;
-          padding: 24px;
-          height: 100%;
-          position: relative;
-        }
-        
-        /* ลายน้ำยันต์ ใช้ Class แทน Pseudo-element เพราะ html2canvas วาด ::before ไม่ค่อยติด */
-        .watermark {
-          position: absolute; font-size: 2.5rem; opacity: 0.15; color: #8b0000; font-family: serif;
-        }
+        .yantra-outer { background: linear-gradient(135deg, #e6c27a 0%, #ffe599 25%, #c59b3c 50%, #ffe599 75%, #996515 100%); border: 4px solid #8b0000; padding: 8px; position: relative; color: #3b1e00; }
+        .yantra-inner { border: 2px solid #e6c27a; padding: 24px; height: 100%; position: relative; }
+        .watermark { position: absolute; font-size: 2.5rem; opacity: 0.15; color: #8b0000; font-family: serif; }
         .watermark-top { top: 5px; left: 10px; }
         .watermark-bottom { bottom: 5px; right: 10px; }
-        
         .yantra-row { border-bottom: 2px dotted rgba(139, 0, 0, 0.3); display: flex; align-items: center; padding: 12px 0; font-weight: 600; }
         .yantra-row:last-child { border-bottom: none; }
         
@@ -266,11 +257,14 @@ export default function ReportPage() {
         .save-btn:hover { transform: translateY(-3px); box-shadow: 0 15px 30px rgba(255,255,255,0.2); }
         .save-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
         
-        .quest-box {
-          background: rgba(255,255,255,0.05); border-left: 4px solid ${themeColor}; padding: 15px 20px;
-          margin-bottom: 12px; border-radius: 0 12px 12px 0; transition: transform 0.2s;
-        }
+        .quest-box { background: rgba(255,255,255,0.05); border-left: 4px solid ${themeColor}; padding: 15px 20px; margin-bottom: 12px; border-radius: 0 12px 12px 0; transition: transform 0.2s; }
         .quest-box:hover { transform: translateX(5px); background: rgba(255,255,255,0.08); }
+
+        /* Responsive สำหรับตัวอักษรใหญ่เวลาเปลี่ยนเป็นข้อความ */
+        @media (max-width: 600px) {
+          .big-number { font-size: 3.5rem !important; }
+          .sub-number { font-size: 1.6rem !important; }
+        }
       `}</style>
 
       <div style={{ maxWidth: '600px', width: '100%', display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
@@ -283,31 +277,50 @@ export default function ReportPage() {
 
         {/* --- Report สรุป Progress ตัวเลข --- */}
         <div className="glass-panel" style={{ padding: '40px 30px', marginBottom: '30px', textAlign: 'center' }}>
-          <h1 style={{ fontSize: '0.9rem', color: themeColor, letterSpacing: '2px', fontWeight: 800 }}>TIME INSIGHT REPORT</h1>
-          <h2 style={{ fontSize: '2.5rem', fontWeight: 900, marginBottom: '30px' }}>เจาะลึก Progress ชีวิต</h2>
+          <h1 style={{ fontSize: '0.9rem', color: themeColor, letterSpacing: '2px', fontWeight: 800 }}>
+            {isRetired ? 'FREEDOM REPORT' : 'LIFE REPORT'}
+          </h1>
+          <h2 style={{ fontSize: '2.5rem', fontWeight: 900, marginBottom: '30px' }}>
+            {isRetired ? 'ชีวิตอิสระ เริ่มต้นแล้ว' : 'แอบส่องเวลาที่เหลือของแก'}
+          </h2>
 
-          <div style={{ background: 'rgba(0,0,0,0.3)', padding: '30px', borderRadius: '24px', marginBottom: '20px' }}>
-            <p style={{ color: '#ccc', marginBottom: '10px' }}>คุณเหลือ "วันเสาร์-อาทิตย์" ให้ใช้ชีวิตอีก</p>
-            <div className="big-number" style={{ fontSize: '5rem' }}>{weekendsLeft.toLocaleString()}</div>
-            <p style={{ fontSize: '1.2rem', fontWeight: 600, color: '#fff' }}>วัน</p>
+          <div style={{ background: 'rgba(0,0,0,0.3)', padding: '30px', borderRadius: '24px', marginBottom: '20px', border: isRetired ? `1px solid ${themeColor}44` : 'none' }}>
+            <p style={{ color: '#ccc', marginBottom: '10px' }}>
+              {isRetired ? 'ยินดีด้วย! คุณมี "วันหยุด" ให้ใช้ชีวิตแบบ' : 'รู้ป่าว แกเหลือ "เสาร์-อาทิตย์" ให้ฟินอีกแค่'}
+            </p>
+            <div className="big-number" style={{ fontSize: '5rem', lineHeight: '1.2' }}>
+              {isRetired ? 'ชิวได้เต็มที่' : weekendsLeft.toLocaleString()}
+            </div>
+            <p style={{ fontSize: '1.2rem', fontWeight: 600, color: '#fff' }}>
+              {isRetired ? 'ไม่ต้องรอวันเสาร์อาทิตย์ 🏝️' : 'วันเองนะเหวย!'}
+            </p>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '30px' }}>
             <div style={{ background: 'rgba(0,0,0,0.3)', padding: '20px', borderRadius: '20px' }}>
-              <p style={{ fontSize: '0.8rem', color: '#888' }}>งวดเงินเดือนที่เหลือ</p>
-              <div style={{ fontSize: '2rem', fontWeight: 800 }}>{paychecksLeft}</div>
+              <p style={{ fontSize: '0.8rem', color: '#888' }}>
+                {isRetired ? 'โหมดรับทรัพย์' : 'รอเงินเดือนออกอีกกี่งวด?'}
+              </p>
+              <div className="sub-number" style={{ fontSize: '2rem', fontWeight: 800 }}>
+                {isRetired ? 'พักร่างได้เลย' : paychecksLeft.toLocaleString()}
+              </div>
             </div>
             <div style={{ background: 'rgba(0,0,0,0.3)', padding: '20px', borderRadius: '20px' }}>
-              <p style={{ fontSize: '0.8rem', color: '#888' }}>วันเวลาที่ตื่นจริง</p>
-              <div style={{ fontSize: '2rem', fontWeight: 800 }}>{activeDaysLeft.toLocaleString()}</div>
+              <p style={{ fontSize: '0.8rem', color: '#888' }}>
+                {isRetired ? 'เวลาตื่นนอน' : 'หักเวลานอนแล้ว เหลือตื่นมาใช้ชีวิต'}
+              </p>
+              <div className="sub-number" style={{ fontSize: '2rem', fontWeight: 800 }}>
+                {isRetired ? 'ตื่นตอนไหนก็ได้' : activeDaysLeft.toLocaleString()} <span style={{fontSize: '1rem', fontWeight: 'normal'}}>{!isRetired && 'วัน'}</span>
+              </div>
             </div>
           </div>
 
-          <div style={{ marginBottom: '30px', textAlign: 'left', background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)' }}>
+          {/* --- Energy Level --- */}
+          <div style={{ marginBottom: '15px', textAlign: 'left', background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={{ fontSize: '1.2rem' }}>💪</span>
-                <span style={{ fontSize: '0.9rem', color: '#ccc', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px' }}>ENERGY LEVEL</span>
+                <span style={{ fontSize: '0.9rem', color: '#ccc', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px' }}>แบตเตอรี่ชีวิต (Energy)</span>
               </div>
               <span style={{ fontSize: '1.8rem', fontWeight: '900', color: themeColor, fontVariantNumeric: 'tabular-nums' }}>{energyLevel}%</span>
             </div>
@@ -320,14 +333,40 @@ export default function ReportPage() {
                 boxShadow: `0 0 20px ${themeColor}aa`,
               }}></div>
             </div>
-            <p style={{ color: '#888', fontSize: '0.8rem', marginTop: '10px', fontWeight: 300, margin: '10px 0 0 0' }}>* สมรรถนะร่างกายเฉลี่ยตามอายุ พีคสุดที่ 30 และค่อยๆ ลดลง</p>
+            <p style={{ color: '#888', fontSize: '0.8rem', marginTop: '10px', fontWeight: 300, margin: '10px 0 0 0' }}>* ร่างกายมันไม่เหมือนเดิมแล้วนะวัยรุ่น พีคสุดตอน 30 หลังจากนั้นแบตเสื่อมไวมาก</p>
           </div>
 
+          {/* --- ซ่อนสูตรคำนวณ (Toggle) --- */}
+          <div style={{ textAlign: 'center', marginBottom: '25px' }}>
+            <button 
+              onClick={() => setShowMath(!showMath)}
+              style={{ background: 'none', border: 'none', color: '#777', textDecoration: 'underline', fontSize: '0.85rem', cursor: 'pointer', fontFamily: "'Kanit', sans-serif" }}
+            >
+              {showMath ? 'ปิดสูตรคำนวณ 🙈' : '🤓 สงสัยป่ะว่าตัวเลขพวกนี้คิดยังไง? (ดูสูตร)'}
+            </button>
+
+            {showMath && (
+              <div className="animate-slide" style={{ marginTop: '15px', padding: '15px 20px', borderRadius: '16px', background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.15)', fontSize: '0.85rem', color: '#aaa', textAlign: 'left', lineHeight: '1.6' }}>
+                <p style={{ margin: '0 0 10px 0', color: themeColor, fontWeight: 600 }}>สูตรลับฉบับวัยรุ่น (อิงเป้าหมายเกษียณ 60 ปี):</p>
+                <ul style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <li><b>วันเสาร์-อาทิตย์:</b> เอาจำนวนวันที่เหลือก่อนอายุ 60 มาหาร 7 (สัปดาห์) แล้วคูณ 2 (วันหยุดสุดสัปดาห์)</li>
+                    <li><b>งวดเงินเดือน:</b> เอาจำนวนวันที่เหลือ หารด้วย 30.44 (ค่าเฉลี่ยจำนวนวันใน 1 เดือน)</li>
+                    <li><b>เวลาที่ตื่นจริง:</b> สมมติว่าคนเรานอน 8 ชม./วัน (คิดเป็น 1/3 ของวัน) เราเลยเอาเวลาที่เหลือมาคูณ 2/3 ซะเลย</li>
+                    <li><b>Energy Level:</b> ร่างกายมนุษย์พีคสุด 100% จนถึงอายุ 30 หลังจากนั้นตีซะว่าพลังจะลดลงเฉลี่ยปีละ 2.5% ตามหลักสังขารเสื่อมถอย 🥲</li>
+                </ul>
+              </div>
+            )}
+          </div>
+
+          {/* --- ข้อสรุป --- */}
           <div style={{ textAlign: 'left', padding: '25px', borderRadius: '20px', background: 'rgba(0,0,0,0.3)', border: `1px solid rgba(255,255,255,0.05)`, position: 'relative' }}>
             <div style={{ position: 'absolute', top: '-15px', left: '20px', background: '#0a0a0c', padding: '0 10px', fontSize: '1.2rem' }}>💡</div>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: '800', marginBottom: '10px', color: '#fff' }}>บทวิเคราะห์การใช้เวลา</h3>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: '800', marginBottom: '10px', color: '#fff' }}>ขอสรุปตรงๆ แบบเพื่อนเตือนเพื่อน</h3>
             <p style={{ color: '#bbb', fontSize: '0.95rem', lineHeight: 1.6, fontWeight: 300, margin: 0 }}>
-              ข้อมูล Progress ชี้ให้เห็นว่า <b style={{ color: themeColor, fontWeight: 600 }}>"เวลาส่วนตัว"</b> มีจำกัดกว่าที่เราคิด การบริหารเวลาและรายได้ในช่วงที่ <b style={{ color: '#fff', fontWeight: 600 }}>Energy Level</b> ยังสูงอยู่ คือกลยุทธ์สำคัญที่จะช่วยให้บรรลุเป้าหมายในชีวิตได้รวดเร็วขึ้น
+              {isRetired 
+                ? <span style={{ color: '#fff' }}>จบแล้วแก ภารกิจสู้ชีวิต! ตอนนี้คือเวลาของแกล้วนๆ อยากทำอะไรทำ อยากกินอะไรกิน (ถ้าหมอไม่ห้ามนะ) รักษาสุขภาพให้ดี จะได้เสพความสุขไปนานๆ</span> 
+                : <span>เห็นตัวเลขแล้วใช่ปะ? เวลาชีวิตเรามัน <b style={{ color: themeColor, fontWeight: 600 }}>มีจำกัดกว่าที่คิดเยอะเลยว่ะ</b> ตอนนี้ที่ <b style={{ color: '#fff', fontWeight: 600 }}>Energy ยังพอมี</b> รีบจัดลำดับความสำคัญในชีวิตใหม่นะ อะไรไม่เวิร์คก็ปล่อยเบลอบ้าง เอาเวลาไปทำสิ่งที่มันฟินดีกว่า!</span>
+              }
             </p>
           </div>
         </div>
@@ -350,10 +389,10 @@ export default function ReportPage() {
         {/* --- The Youth Roadmap --- */}
         <div className="glass-panel" style={{ padding: '30px', marginBottom: '30px' }}>
           <h2 style={{ fontSize: '1.4rem', fontWeight: 900, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            🗺️ THE YOUTH ROADMAP
+            🗺️ {isRetired ? 'THE FREEDOM ROADMAP' : 'THE YOUTH ROADMAP'}
           </h2>
           <p style={{ color: '#ccc', fontSize: '0.95rem', marginBottom: '20px' }}>
-            แผนที่ภารกิจด่วน 3 ข้อ ที่ชาว <b style={{ color: themeColor }}>{genSummary.gen}</b> ควรเริ่มทำตั้งแต่วันนี้ เพื่อคุณภาพชีวิตที่ดีก่อนหมดโควต้าวัยรุ่น/วัยทำงาน:
+            นี่คือเควสต์ด่วน 3 ข้อ ที่ชาว <b style={{ color: themeColor }}>{genSummary.gen}</b> อย่างแกควรเริ่มทำตั้งแต่วันนี้ รีบทำก่อนโควต้าวัยรุ่นจะหมด:
           </p>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {genSummary.quests.map((quest, idx) => (
@@ -369,12 +408,10 @@ export default function ReportPage() {
           </div>
         </div>
 
-        {/* 🟡 ยันต์แผ่นทอง 9 แถว (ครอบด้วย yantraRef เพื่อเซฟเฉพาะส่วนนี้) 🟡 */}
-        {/* ปรับโครงสร้าง CSS ให้เข้ากับ html2canvas (ใช้ Real DOM แทน) */}
+        {/* 🟡 ยันต์แผ่นทอง 9 แถว 🟡 */}
         <div ref={yantraRef} className="yantra-outer" style={{ borderRadius: '24px', marginBottom: '20px' }}>
           <div className="yantra-inner" style={{ borderRadius: '16px' }}>
 
-            {/* ลายน้ำอักขระ (ใช้ Div ของจริง) */}
             <div className="watermark watermark-top">ॐ</div>
             <div className="watermark watermark-bottom">ॐ</div>
 
@@ -383,7 +420,7 @@ export default function ReportPage() {
                 ๏ ยันต์แผ่นทอง ๙ แถว ๚
               </h2>
               <p style={{ color: '#8b0000', fontWeight: '800', fontSize: '1.2rem', marginTop: '5px' }}>
-                #วัยรุ่นยังไหว (ชาว {genSummary.gen}) ๛
+                #{isRetired ? 'รุ่นใหญ่ใจนิ่ง' : 'วัยรุ่นยังไหว'} (ชาว {genSummary.gen}) ๛
               </p>
             </div>
 
@@ -399,7 +436,7 @@ export default function ReportPage() {
             </div>
 
             <div style={{ textAlign: 'center', marginTop: '20px', fontSize: '0.8rem', color: '#8b0000', opacity: 0.8, fontWeight: 600, position: 'relative', zIndex: 10 }}>
-              ปลุกเสกด้วยพลังวัยรุ่น • อัพสกิลกับฟุ้ย
+              ปลุกเสกด้วยพลัง{isRetired ? 'รุ่นใหญ่' : 'วัยรุ่น'} • อัพสกิลกับฟุ้ย
             </div>
 
           </div>
@@ -407,7 +444,6 @@ export default function ReportPage() {
 
       </div>
 
-      {/* ปุ่ม SAVE (เซฟเฉพาะยันต์) */}
       <div style={{ textAlign: 'center', width: '100%', maxWidth: '600px', marginTop: '10px' }}>
         <button
           onClick={handleSaveYantra}
