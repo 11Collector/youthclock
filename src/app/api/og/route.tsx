@@ -97,6 +97,8 @@ export async function GET(request: Request) {
     const activeYears = ((daysLeft / 365.25) * (2 / 3)).toFixed(1);
     const sleepYears = ((daysLeft / 365.25) * (1 / 3)).toFixed(1);
     const totalBeatsLived = daysLived * 100000;
+// ... (ส่วนบนเหมือนเดิมจนถึงบรรทัดที่เรียกใช้ generationInfo)
+
     const generationInfo = getGenerationRoast(birthDate.getFullYear());
 
     return new ImageResponse(
@@ -165,7 +167,7 @@ export async function GET(request: Request) {
                   <span style={{ fontSize: 18, fontWeight: 'bold' }}>{totalBeatsLived.toLocaleString()} ครั้ง</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: 10, marginBottom: 10 }}>
-                  <span style={{ fontSize: 18, color: '#aaa' }}>เวลาที่ตื่นตริงๆ</span>
+                  <span style={{ fontSize: 18, color: '#aaa' }}>เวลาที่ตื่นจริงๆ</span>
                   <span style={{ fontSize: 18, fontWeight: 'bold', color: '#4ade80' }}>{activeYears} ปี</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -175,7 +177,7 @@ export async function GET(request: Request) {
               </div>
             </div>
 
-            {/* Generation Insight Card - Premium Redesign in OG */}
+            {/* Generation Insight Card - แก้ไขจุดที่ Property ไม่มีอยู่จริงตรงนี้ครับ 👇 */}
             <div style={{ 
               display: 'flex',
               flexDirection: 'column',
@@ -191,9 +193,9 @@ export async function GET(request: Request) {
                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <div style={{ display: 'flex', fontSize: '2rem', fontWeight: 'bold', color: generationInfo.color, textShadow: `0 0 10px ${generationInfo.color}44` }}>
-                      {generationInfo.name}
+                      GENERATION INSIGHT
                     </div>
-                    <div style={{ display: 'flex', fontSize: '1rem', color: '#888' }}>{generationInfo.years}</div>
+                    <div style={{ display: 'flex', fontSize: '1rem', color: '#888' }}>Analysis by AI</div>
                   </div>
                 </div>
 
@@ -213,11 +215,11 @@ export async function GET(request: Request) {
 
                 <div style={{ display: 'flex', flexDirection: 'column', marginBottom: 20 }}>
                    <div style={{ display: 'flex', fontSize: '0.9rem', color: '#888', fontWeight: 'bold', marginBottom: 5 }}>ความจริงที่กวน</div>
-                   <div style={{ display: 'flex', fontSize: '1.1rem', color: '#bbb', fontStyle: 'italic', lineHeight: 1.5 }}>{generationInfo.fact}</div>
+                   <div style={{ display: 'flex', fontSize: '1.1rem', color: '#bbb', fontStyle: 'italic', lineHeight: 1.5 }}>{generationInfo.roast}</div>
                 </div>
 
                 <div style={{ display: 'flex', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 15 }}>
-                   <div style={{ display: 'flex', fontSize: '1.2rem', fontWeight: 'bold', color: generationInfo.color }}>"{generationInfo.definition}"</div>
+                   <div style={{ display: 'flex', fontSize: '1.2rem', fontWeight: 'bold', color: generationInfo.color }}>#วัยรุ่นยังไหว</div>
                 </div>
             </div>
           </div>
@@ -228,6 +230,7 @@ export async function GET(request: Request) {
           </div>
         </div>
       ),
+// ... (ส่วนล่างเหมือนเดิม)
       {
         width: 1080,
         height: 1080,
