@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import html2canvas from 'html2canvas';
 import { beToCe } from '../lib/dateUtils';
 
@@ -21,7 +20,7 @@ export default function Home() {
   const [showQR, setShowQR] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   
-  // เพิ่ม State และ Ref สำหรับการ Save รูป
+  const [previewImg, setPreviewImg] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
 
@@ -68,32 +67,28 @@ export default function Home() {
     };
     return {
       gen: "The Ancient", nickname: "ผู้พิทักษ์กาลเวลา", icon: "🏛️",
-      fact: "ประวัติศาสตร์เดินได้", quote: "อาบน้ำร้อนมาก่อน",
+      fact: "ประวัติศาสตร์เดินได้ อายุเป็นเพียงตัวเลข", quote: "อาบน้ำร้อนมาก่อน",
       stats: [{ icon: '📜', label: 'จารึกแผ่นหิน' }, { icon: '🏺', label: 'ของโบราณ' }, { icon: '⏳', label: 'เวลาเหลือเฟือ' }]
     };
   };
 
   const handleCalculate = () => {
     if (!day || !month || !yearBE) {
-      alert('กรุณากรอกข้อมูลให้ครบถ้วนก่อนเข้าสู่โหมดวัยรุ่น!');
+      alert('กรุณากรอกข้อมูลให้ครบก่อนนะวัยรุ่น!');
       return;
     }
     const beYearInt = parseInt(yearBE);
     const yearCE = beToCe(beYearInt);
     const birthDateStr = `${yearCE}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00`;
     const birthDate = new Date(birthDateStr);
-
     if (isNaN(birthDate.getTime())) {
       alert('ดูเหมือนวันที่เกิดจะผิดพลาด ลองเช็คอีกทีนะครับ');
       return;
     }
-
     const youthEndDate = new Date(birthDate);
     youthEndDate.setFullYear(youthEndDate.getFullYear() + YOUTH_LIMIT_AGE);
     setDiffMs(youthEndDate.getTime() - new Date().getTime());
-
     setRoast(getGenData(beYearInt));
-    
     window.scrollTo(0, 0); 
     setStep(2);
   };
@@ -108,40 +103,45 @@ export default function Home() {
         window.location.assign(`/report?session_id=${dummySessionId}`);
       }, 100);
     } catch (error) {
-      console.error("error:", error);
       setIsRedirecting(false);
     }
   };
 
-  // ฟังก์ชัน Save รูปของหน้าแรก (Step 2)
   const handleSaveImage = async () => {
     if (!resultRef.current) return;
     setIsSaving(true);
-
     try {
       await document.fonts.ready;
       window.scrollTo(0, 0);
-      await new Promise(resolve => setTimeout(resolve, 300)); // หน่วงให้ Render ทัน
+      await new Promise(resolve => setTimeout(resolve, 500)); 
 
       const canvas = await html2canvas(resultRef.current, {
         scale: 2,
-        backgroundColor: '#0e0e16', // สีพื้นหลังอิงตาม Gradient ของหน้าเว็บ
+        backgroundColor: '#0a0a0c',
         useCORS: true,
+        allowTaint: true,
         logging: false,
       });
 
-      const image = canvas.toDataURL('image/jpeg', 0.9);
-      const link = document.createElement('a');
-      link.href = image;
-      link.download = `Youth-Vibe-Check-${Date.now()}.jpg`;
+      const dataUrl = canvas.toDataURL('image/png');
 
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      canvas.toBlob(async (blob) => {
+        if (!blob) throw new Error('Blob creation failed');
+        const file = new File([blob], `YouthClock-${Date.now()}.png`, { type: 'image/png' });
+        
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], title: 'Youth Clock', text: 'เช็คเวลาวัยรุ่นของฉัน' });
+          } catch (err) {
+            setPreviewImg(dataUrl);
+          }
+        } else {
+          setPreviewImg(dataUrl);
+        }
+      }, 'image/png');
 
     } catch (error) {
-      console.error("Save failed:", error);
-      alert('เกิดข้อผิดพลาดในการบันทึกภาพครับ ลองอีกครั้งนะครับ');
+      alert('เซฟรูปไม่สำเร็จ ลองแคปหน้าจอแทนนะครับ');
     } finally {
       setIsSaving(false);
     }
@@ -154,7 +154,6 @@ export default function Home() {
     const birthDate = new Date(birthDateStr);
     const youthEndDate = new Date(birthDate);
     youthEndDate.setFullYear(youthEndDate.getFullYear() + YOUTH_LIMIT_AGE);
-
     const updateTimer = () => {
       const now = new Date();
       setDiffMs(youthEndDate.getTime() - now.getTime());
@@ -181,219 +180,158 @@ export default function Home() {
   if (!isClient) return null;
 
   return (
-    <main 
-      style={{ 
-        minHeight: step === 1 ? '100dvh' : '100vh', 
-        height: step === 1 ? '100dvh' : 'auto', 
-        overflow: step === 1 ? 'hidden' : 'auto',
-        display: 'flex', 
-        flexDirection: 'column', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        padding: step === 1 ? '16px' : '40px 16px', 
-        background: 'radial-gradient(circle at center, #1a1a2e 0%, #0a0a0c 100%)', 
-        color: '#fff', 
-        fontFamily: "'Kanit', sans-serif" 
-      }}
-    >
+    <main style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: step === 1 ? 'center' : 'flex-start', padding: '16px', background: 'radial-gradient(circle at center, #1a1a2e 0%, #0a0a0c 100%)', color: '#fff', fontFamily: "'Kanit', sans-serif", width: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
+      
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Kanit:ital,wght@0,300;0,400;0,600;0,800;0,900;1,400&display=swap');
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-in { animation: fadeIn 0.4s ease-out forwards; }
-        .glass-card { backdrop-filter: blur(16px); background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 24px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); width: 100%; box-sizing: border-box; }
-        .input-glow:focus { outline: none; border-color: #00f2ff !important; box-shadow: 0 0 10px rgba(0, 242, 255, 0.3); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-in { animation: fadeIn 0.5s ease-out forwards; }
+        .glass-card { backdrop-filter: blur(20px); background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 28px; width: 100%; box-sizing: border-box; }
+        .input-glow:focus { border-color: #00f2ff; box-shadow: 0 0 15px rgba(0, 242, 255, 0.3); outline: none; }
         
-        .input-glow { font-family: 'Kanit', sans-serif !important; }
-        .input-glow::placeholder { font-family: 'Kanit', sans-serif; color: #666; font-weight: 400; font-size: 1.1rem; }
+        .tabular-nums { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
         
-        ${step === 1 ? `body { overflow: hidden; margin: 0; padding: 0; }` : `body { overflow-x: hidden; }`}
-        
-        @media (max-width: 600px) {
-          h1 { font-size: 2.5rem !important; }
-          .countdown-text { font-size: 2.8rem !important; }
-          .countdown-unit { font-size: 1.2rem !important; }
-          .stats-grid { grid-template-columns: 1fr !important; }
-          .glass-card { padding: 30px 20px !important; }
-          .qr-modal-content { padding: 30px 20px !important; width: 95% !important; }
-          .input-grid { gap: 8px !important; }
-        }
-
-        /* Class สำหรับซ่อนตอน Save รูป */
-        .hide-on-export { display: flex; }
+        .exporting .glass-card { backdrop-filter: none !important; background: rgba(30, 30, 40, 0.95) !important; }
         .exporting .hide-on-export { display: none !important; }
+
+        @media (max-width: 480px) {
+          .countdown-text { font-size: 2.8rem !important; }
+          .main-title { font-size: 2.5rem !important; }
+          .glass-card { padding: 24px 20px !important; }
+          .stats-label { font-size: 0.7rem !important; }
+        }
       `}</style>
 
-      {/* Modal QR Code */}
+      {/* Preview Modal */}
+      {previewImg && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <p style={{ marginBottom: '15px', color: '#00f2ff', fontWeight: 600, textAlign: 'center' }}>📱 กดค้างที่รูปด้านล่าง <br /> เพื่อเลือก "Save Image / บันทึกรูปภาพ"</p>
+          <img src={previewImg} alt="Preview" style={{ width: '100%', maxWidth: '380px', borderRadius: '20px', boxShadow: '0 0 40px rgba(0,242,255,0.2)' }} />
+          <button onClick={() => setPreviewImg(null)} style={{ marginTop: '25px', padding: '12px 40px', borderRadius: '14px', background: '#fff', color: '#000', border: 'none', fontWeight: 800 }}>ปิด</button>
+        </div>
+      )}
+
+      {/* Popup QR */}
       {showQR && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(10px)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px' }}>
-          <div className="animate-in qr-modal-content" style={{ background: '#fff', padding: '40px', borderRadius: '32px', maxWidth: '400px', width: '100%', textAlign: 'center', color: '#1a1a1a', maxHeight: '95vh', overflowY: 'auto' }}>
-            <div style={{ fontSize: '2rem', marginBottom: '10px' }}>🐱</div>
-            <h3 style={{ fontSize: '1.5rem', fontWeight: '800', marginBottom: '8px' }}>ช่วยค่าขนมเด็กๆ</h3>
-            <p style={{ fontSize: '0.95rem', color: '#666', marginBottom: '20px', fontWeight: '400' }}>โอนเพื่อรับ "ยันต์กันแก่" <br /> และผลวิเคราะห์</p>
-
-            <img src="/qr.png" alt="QR Code" style={{ width: '100%', maxWidth: '280px', margin: '0 auto 20px', display: 'block', borderRadius: '15px', border: '1px solid #eee' }} />
-
-            <button
-              onClick={handleConfirmPayment}
-              disabled={isRedirecting}
-              style={{ width: '100%', padding: '16px', borderRadius: '16px', background: isRedirecting ? '#aaa' : 'linear-gradient(45deg, #00f2ff, #0061ff)', color: '#fff', border: 'none', fontWeight: '800', cursor: isRedirecting ? 'not-allowed' : 'pointer', fontSize: '1.1rem', fontFamily: "'Kanit', sans-serif", marginBottom: '12px' }}
-            >
-              {isRedirecting ? 'กำลังสร้าง Report...' : 'ฉันโอนเงินแล้ว (ดู Report)'}
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(12px)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div className="animate-in" style={{ background: '#fff', padding: '24px', borderRadius: '32px', maxWidth: '380px', width: '100%', textAlign: 'center', color: '#1a1a1a', maxHeight: '85dvh', overflowY: 'auto' }}>
+            <div style={{ fontSize: '1.5rem', marginBottom: '4px' }}>🐱</div>
+            <h3 style={{ fontSize: '1.3rem', fontWeight: '800' }}>ช่วยค่าขนมเด็กๆ</h3>
+            <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '16px' }}>โอนเพื่อรับ "ยันต์กันแก่" และบทวิเคราะห์</p>
+            <img src="/qr.png" alt="QR" style={{ width: '100%', maxWidth: '200px', borderRadius: '12px', marginBottom: '16px', border: '1px solid #eee' }} />
+            <button onClick={handleConfirmPayment} disabled={isRedirecting} style={{ width: '100%', padding: '14px', borderRadius: '16px', background: isRedirecting ? '#ccc' : 'linear-gradient(45deg, #00f2ff, #0061ff)', color: '#fff', border: 'none', fontWeight: '800', fontSize: '1rem', marginBottom: '8px' }}>
+              {isRedirecting ? 'กำลังสร้าง...' : 'ฉันโอนแล้ว (ดู Report)'}
             </button>
-
-            <button
-              onClick={() => setShowQR(false)}
-              disabled={isRedirecting}
-              style={{ width: '100%', padding: '12px', borderRadius: '16px', background: 'transparent', color: '#888', border: '1px solid #ddd', fontWeight: '600', cursor: 'pointer', fontSize: '1rem', fontFamily: "'Kanit', sans-serif" }}
-            >
-              ยกเลิก
-            </button>
+            <button onClick={() => setShowQR(false)} style={{ background: 'transparent', color: '#888', border: 'none', fontSize: '0.9rem' }}>ยกเลิก</button>
           </div>
         </div>
       )}
 
       {step === 1 ? (
-        <div className="glass-card animate-in" style={{ padding: '50px 40px', maxWidth: '500px' }}>
-          <div style={{ fontSize: '4rem', marginBottom: '10px' }}>⌛</div>
-          <h1 style={{ fontSize: '3.5rem', fontWeight: '900', letterSpacing: '-1px', marginBottom: '10px', background: 'linear-gradient(to right, #00f2ff, #784BA0, #FF3CAC)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>YOUTH CLOCK</h1>
-          <p style={{ color: '#888', marginBottom: '40px', fontSize: '1.1rem', lineHeight: '1.5' }}>
-            ป้อนวันเกิดของคุณเพื่อเช็คว่าเหลือเวลา <br /> ใช้ชีวิตแบบ <b style={{ color: '#fff' }}>"วัยรุ่น"</b> อีกเท่าไหร่?
-          </p>
-
-          <div className="input-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.5fr', gap: '12px', marginBottom: '30px' }}>
+        <div className="glass-card animate-in" style={{ padding: '40px', maxWidth: '450px', textAlign: 'center' }}>
+          <div style={{ fontSize: '3.5rem', marginBottom: '8px' }}>⌛</div>
+          <h1 className="main-title" style={{ fontSize: '3.2rem', fontWeight: '900', letterSpacing: '-1.5px', background: 'linear-gradient(to right, #00f2ff, #FF3CAC)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: 1 }}>YOUTH CLOCK</h1>
+          <p style={{ color: '#aaa', marginBottom: '32px', fontSize: '0.95rem', fontWeight: 300 }}>ป้อนวันเกิดเพื่อเช็คว่าเหลือเวลาใช้ชีวิต <br/> แบบ <b style={{ color: '#fff', fontWeight: 600 }}>"วัยรุ่น"</b> อีกเท่าไหร่?</p>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.3fr', gap: '12px', marginBottom: '24px' }}>
             {[{ label: 'วัน', val: day, set: setDay }, { label: 'เดือน', val: month, set: setMonth }, { label: 'พ.ศ.', val: yearBE, set: setYearBE }].map((item, idx) => (
-              <input
-                key={idx}
-                type="number"
-                inputMode="numeric"
-                placeholder={item.label}
-                value={item.val}
-                onChange={e => item.set(e.target.value)}
-                className="input-glow"
-                style={{ width: '100%', padding: '15px 5px', borderRadius: '16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', textAlign: 'center', fontSize: '1.5rem', fontWeight: '900', fontFamily: "'Kanit', sans-serif" }}
-              />
+              <input key={idx} type="number" inputMode="numeric" placeholder={item.label} value={item.val} onChange={e => item.set(e.target.value)} className="input-glow" style={{ width: '100%', padding: '16px 0', borderRadius: '16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', textAlign: 'center', fontSize: '1.3rem', fontWeight: '800', fontFamily: 'Kanit' }} />
             ))}
           </div>
 
-          <button
-            onClick={handleCalculate}
-            style={{ width: '100%', padding: '20px', borderRadius: '20px', background: '#fff', color: '#000', fontWeight: '900', fontSize: '1.3rem', cursor: 'pointer', border: 'none', fontFamily: "'Kanit', sans-serif" }}
-          >
-            จัดไปวัยรุ่น ⚡️
-          </button>
-
-          <div style={{ marginTop: '20px', fontSize: '0.8rem', color: '#777', fontWeight: 300, lineHeight: '1.5' }}>
-            🔒 <b style={{color: '#aaa', fontWeight: 600}}>ไม่มีการเก็บข้อมูลส่วนตัวใดๆ</b> <br/>
+          <button onClick={handleCalculate} style={{ width: '100%', padding: '18px', borderRadius: '20px', background: '#fff', color: '#000', fontWeight: '900', fontSize: '1.2rem', border: 'none', boxShadow: '0 8px 20px rgba(0,0,0,0.3)' }}>VIBE CHECK! ⚡️</button>
+          
+          <div style={{ marginTop: '24px', fontSize: '0.75rem', color: '#666', fontWeight: 300, lineHeight: '1.5', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '20px' }}>
+            🔒 <b style={{color: '#999', fontWeight: 600}}>ไม่มีการเก็บข้อมูลส่วนตัวใดๆ</b> <br/>
             ระบบคำนวณผ่านเบราว์เซอร์ของคุณเท่านั้น <br/> 
-            แอปนี้สร้างขึ้นเพื่อ <b style={{color: '#aaa', fontWeight: 400}}>"ความตื่นรู้ในการใช้ชีวิต"</b> ล้วนๆ
+            สร้างขึ้นเพื่อ <b style={{color: '#999', fontWeight: 400}}>"ความตื่นรู้ในการใช้ชีวิต"</b> ล้วนๆ
           </div>
-
         </div>
       ) : (
-        <div className="animate-in" style={{ maxWidth: '600px', width: '100%' }}>
+        <div className="animate-in" style={{ maxWidth: '600px', width: '100%', paddingTop: '10px' }}>
           
-          {/* 👇 ส่วนที่จะถูกแคปเจอร์เป็นรูปภาพ 👇 */}
-          <div 
-            ref={resultRef} 
-            className={isSaving ? 'exporting' : ''} 
-            style={{ padding: isSaving ? '20px' : '0', background: isSaving ? '#0e0e16' : 'transparent', borderRadius: '24px' }}
-          >
-            <div className="glass-card" style={{ padding: '40px', textAlign: 'center', marginBottom: '20px' }}>
-              <p style={{ letterSpacing: '2px', fontSize: '0.9rem', fontWeight: '800', marginBottom: '15px', color: isPastYouth ? '#00f2ff' : '#ff4e50' }}>
-                {isPastYouth ? '⚡️ คุณย้ายออกจากวัยรุ่นมาแล้ว' : '🔥 เวลาวัยรุ่นที่เหลืออยู่'}
-              </p>
+          <div ref={resultRef} className={isSaving ? 'exporting' : ''} style={{ padding: isSaving ? '24px' : '0', background: isSaving ? '#0a0a0c' : 'transparent', borderRadius: '24px' }}>
+<div className="glass-card" style={{ padding: '40px 20px', textAlign: 'center', marginBottom: '12px' }}>
+  <p style={{ letterSpacing: '1.5px', fontSize: '0.85rem', fontWeight: '800', marginBottom: '24px', color: isPastYouth ? '#00f2ff' : '#ff4e50', textTransform: 'uppercase' }}>
+    {isPastYouth ? '⚡️ เกินลิมิตวัยรุ่นมาแล้ว' : '🔥 เวลาวัยรุ่นที่เหลืออยู่'}
+  </p>
+  
+<div className="countdown-text tabular-nums" style={{ lineHeight: '1.2', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+  
+  {/* แถวที่ 1: ปี และ วัน */}
+  <div>
+    {cd.years > 0 && (
+      <span style={{ fontSize: '3.5rem', fontWeight: '900', letterSpacing: '2px' }}>
+        {cd.years}
+        <span style={{ fontSize: '1.2rem', fontWeight: '400', color: '#888', marginLeft: '8px', marginRight: '20px' }}>ปี</span>
+      </span>
+    )}
+    <span style={{ fontSize: '3.5rem', fontWeight: '900', letterSpacing: '2px' }}>
+      {cd.days}
+      <span style={{ fontSize: '1.2rem', fontWeight: '400', color: '#888', marginLeft: '8px' }}>วัน</span>
+    </span>
+  </div>
 
-              <div className="countdown-text" style={{ fontSize: '3.8rem', fontWeight: '900', lineHeight: '1.1', fontVariantNumeric: 'tabular-nums' }}>
-                {cd.years > 0 && <span>{cd.years}<span className="countdown-unit" style={{ fontSize: '1.5rem', fontWeight: '400' }}>ปี </span></span>}
-                {cd.days}<span className="countdown-unit" style={{ fontSize: '1.5rem', fontWeight: '400' }}>วัน</span> <br />
-                <span style={{ color: isPastYouth ? '#00f2ff' : '#ff4e50' }}>
-                  {String(cd.hours).padStart(2, '0')}:{String(cd.minutes).padStart(2, '0')}:{String(cd.seconds).padStart(2, '0')}
-                </span>
-                <span style={{ fontSize: '1.5rem', opacity: 0.4 }}>.{String(cd.milliseconds).padStart(2, '0')}</span>
+  {/* แถวที่ 2: ชม. นาที วินาที (แยกหน่วยชัดเจน ไม่เบียด) */}
+  <div style={{ color: isPastYouth ? '#00f2ff' : '#ff4e50' }}>
+    <span style={{ fontSize: '2.8rem', fontWeight: '900', letterSpacing: '2px' }}>
+      {String(cd.hours).padStart(2, '0')}
+      <span style={{ fontSize: '1rem', fontWeight: '400', color: '#888', opacity: 0.7, marginLeft: '4px', marginRight: '12px' }}>ชม.</span>
+    </span>
+    <span style={{ fontSize: '2.8rem', fontWeight: '900', letterSpacing: '2px' }}>
+      {String(cd.minutes).padStart(2, '0')}
+      <span style={{ fontSize: '1rem', fontWeight: '400', color: '#888', opacity: 0.7, marginLeft: '4px', marginRight: '12px' }}>นาที</span>
+    </span>
+    <span style={{ fontSize: '2.8rem', fontWeight: '900', letterSpacing: '2px' }}>
+      {String(cd.seconds).padStart(2, '0')}
+      <span style={{ fontSize: '1rem', fontWeight: '400', color: '#888', opacity: 0.7, marginLeft: '4px' }}>วิ</span>
+    </span>
+  </div>
+
+</div>
+</div>
+
+            {/* Gen Roast Card */}
+            <div className="glass-card" style={{ padding: '28px 24px', marginBottom: '12px', textAlign: 'center' }}>
+              <span style={{ fontSize: '3.2rem', display: 'block', marginBottom: '10px' }}>{roast?.icon}</span>
+              <div style={{ fontSize: '0.8rem', color: isPastYouth ? '#00f2ff' : '#ff4e50', fontWeight: '800', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '1px' }}>{roast?.gen} : {roast?.nickname}</div>
+              <div style={{ fontSize: '1.3rem', fontWeight: '700', lineHeight: '1.3', marginBottom: '15px', color: '#fff' }}>"{roast?.quote}"</div>
+              <div style={{ fontSize: '0.95rem', color: '#bbb', background: 'rgba(0,0,0,0.3)', padding: '16px', borderRadius: '20px', lineHeight: 1.6, fontWeight: 300, textAlign: 'left', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <b style={{ color: isPastYouth ? '#00f2ff' : '#ff4e50', fontWeight: '600' }}>Fact Check : </b> {roast?.fact}
               </div>
             </div>
 
-            <div className="glass-card" style={{ padding: '30px', marginBottom: '20px', position: 'relative', overflow: 'hidden' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', textAlign: 'center' }}>
-                <span style={{ fontSize: '3.5rem' }}>{roast?.icon}</span>
-                <div>
-                  <div style={{ fontSize: '0.9rem', color: isPastYouth ? '#00f2ff' : '#ff4e50', fontWeight: '800', letterSpacing: '1px' }}>{roast?.gen}</div>
-                  <div style={{ fontSize: '1.2rem', fontWeight: '600', margin: '5px 0' }}>"{roast?.quote}"</div>
-                </div>
-                <div style={{ fontSize: '0.95rem', color: '#ccc', background: 'rgba(0,0,0,0.3)', padding: '15px', borderRadius: '16px', fontWeight: '300', width: '100%' }}>
-                  {roast?.fact}
-                </div>
-              </div>
-            </div>
-
-            <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '25px' }}>
+            {/* Stats Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '24px' }}>
               {roast?.stats?.map((stat: any, idx: number) => (
-                <div key={idx} className="glass-card" style={{ padding: '20px 10px', textAlign: 'center' }}>
+                <div key={idx} className="glass-card" style={{ padding: '20px 10px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
                   <div style={{ fontSize: '2rem', marginBottom: '8px' }}>{stat.icon}</div>
-                  <div style={{ fontSize: '0.8rem', color: '#999', fontWeight: '600' }}>{stat.label}</div>
+                  <div className="stats-label" style={{ fontSize: '0.8rem', color: '#999', fontWeight: '600', letterSpacing: '0.5px' }}>{stat.label}</div>
                 </div>
               ))}
             </div>
-
-            {/* ลายเซ็นที่จะแสดงเฉพาะตอนเซฟเป็นรูปภาพ */}
-            {isSaving && (
-              <div style={{ textAlign: 'center', fontSize: '0.8rem', color: '#666', marginTop: '10px', paddingBottom: '10px' }}>
-                CREATED BY อัพสกิลกับฟุ้ย (YOUTH CLOCK)
-              </div>
-            )}
+            {isSaving && <div style={{ textAlign: 'center', fontSize: '0.7rem', color: '#555', marginTop: '10px', letterSpacing: '2px' }}>CREATED BY อัพสกิลกับฟุ้ย</div>}
           </div>
-          {/* 👆 สิ้นสุดส่วนที่ถูกแคปเจอร์ 👆 */}
 
-
-          {/* ส่วนนี้คือปุ่ม Action ต่างๆ (จะถูกซ่อนถ้ามีการใส่ class hide-on-export) */}
-          <div className="hide-on-export" style={{ textAlign: 'center', flexDirection: 'column', width: '100%' }}>
-            
-            {/* ปุ่มใหม่: เซฟรูปเฉพาะหน้านี้ */}
-            <button
-              onClick={handleSaveImage}
-              disabled={isSaving}
-              style={{ width: '100%', padding: '16px', borderRadius: '24px', background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', fontWeight: '600', fontSize: '1.1rem', marginBottom: '20px', cursor: 'pointer', fontFamily: "'Kanit', sans-serif" }}
-            >
-              {isSaving ? '⏳ กำลังแชะภาพ...' : '📸 เซฟรูปหน้านี้ไว้อวดเพื่อน'}
+          {/* Action Buttons */}
+          <div className="hide-on-export" style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '12px', padding: '0 8px' }}>
+            <button onClick={handleSaveImage} disabled={isSaving} style={{ width: '100%', padding: '16px', borderRadius: '24px', background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)', fontWeight: '600', fontSize: '1rem', cursor: 'pointer', transition: 'all 0.2s' }}>
+              {isSaving ? '⏳ กำลังแชะภาพ...' : '📸 เซฟรูปไว้อวดเพื่อน'}
             </button>
-
-            <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
-              <img src="/cat.png" alt="Cat" style={{ width: '60px', height: '60px', borderRadius: '50%', border: '2px solid #ffd700' }} />
-              <p style={{ fontSize: '0.9rem', color: '#ffd700', textAlign: 'left', margin: 0 }}>
-                "สมทบทุนค่าขนมแมวและค่ากาแฟ <br /> เพื่อรับบทวิเคราะห์เชิงลึก"
-              </p>
+            
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', margin: '8px 0' }}>
+              <img src="/cat.png" alt="Cat" style={{ width: '48px', height: '48px', borderRadius: '50%', border: '2px solid #ffd700', objectFit: 'cover' }} />
+              <p style={{ fontSize: '0.85rem', color: '#ffd700', textAlign: 'left', margin: 0, lineHeight: '1.4' }}>สมทบทุนค่าขนมแมว <br/> เพื่อรับบทวิเคราะห์เชิงลึก</p>
             </div>
 
-            {/* ปุ่มไป Report */}
-            <button
-              onClick={() => setShowQR(true)}
-              style={{ width: '100%', padding: '20px', borderRadius: '24px', background: 'linear-gradient(45deg, #00f2ff, #0061ff)', color: '#fff', border: 'none', fontWeight: '800', fontSize: '1.2rem', cursor: 'pointer' }}
-            >
-              รับบทวิเคราะห์เชิงลึก & ยันต์กันแก่ (49.-)
-            </button>
-
-            <button onClick={() => {
-              setStep(1);
-              window.scrollTo(0, 0); 
-            }} style={{ background: 'transparent', border: 'none', color: '#777', marginTop: '20px', textDecoration: 'underline', fontSize: '0.9rem', cursor: 'pointer' }}>
-              คำนวณใหม่
-            </button>
+            <button onClick={() => setShowQR(true)} style={{ width: '100%', padding: '18px', borderRadius: '24px', background: 'linear-gradient(45deg, #00f2ff, #0061ff)', color: '#fff', border: 'none', fontWeight: '800', fontSize: '1.1rem', cursor: 'pointer', boxShadow: '0 10px 20px rgba(0, 97, 255, 0.3)' }}>รับบทวิเคราะห์เชิงลึก & ยันต์พลังวัยรุ่น (49.-)</button>
+            
+            <button onClick={() => { setStep(1); window.scrollTo(0, 0); }} style={{ background: 'transparent', border: 'none', color: '#555', textDecoration: 'underline', fontSize: '0.9rem', cursor: 'pointer', marginTop: '8px' }}>คำนวณใหม่</button>
           </div>
-
         </div>
       )}
 
-      {step === 1 && (
-        <div style={{ position: 'absolute', bottom: '20px', fontSize: '0.75rem', color: '#555', textAlign: 'center' }}>
-          CREATED BY อัพสกิลกับฟุ้ย
-        </div>
-      )}
-      
-      {step === 2 && (
-        <footer className="hide-on-export" style={{ marginTop: '40px', fontSize: '0.75rem', color: '#555', textAlign: 'center' }}>
-          CREATED BY อัพสกิลกับฟุ้ย
-        </footer>
-      )}
+      <footer className="hide-on-export" style={{ marginTop: '40px', fontSize: '0.7rem', color: '#444', textAlign: 'center', letterSpacing: '1px' }}>CREATED BY อัพสกิลกับฟุ้ย</footer>
     </main>
   );
 }
