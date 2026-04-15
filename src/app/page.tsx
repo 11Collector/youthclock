@@ -279,7 +279,7 @@ export default function Home() {
             onClick={handleCalculate}
             style={{ width: '100%', padding: '20px', borderRadius: '20px', background: '#fff', color: '#000', fontWeight: '900', fontSize: '1.3rem', cursor: 'pointer', border: 'none', fontFamily: "'Kanit', sans-serif" }}
           >
-            VIBE CHECK! ⚡️
+            จัดไปวัยรุ่น ⚡️
           </button>
 
           <div style={{ marginTop: '20px', fontSize: '0.8rem', color: '#777', fontWeight: 300, lineHeight: '1.5' }}>
